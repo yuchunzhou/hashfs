@@ -4,6 +4,8 @@ A file storage service
 ### How to use it?
 Start up the service at terminal
 ```bash
+# You can specify the storage root path and access domain when you start up the service
+# RUST_LOG=info cargo run STORAGE_ROOT=./data ACCESS_DOMAIN=your_domain
 $ RUST_LOG=info cargo run 
     Finished dev [unoptimized + debuginfo] target(s) in 0.12s
      Running `target/debug/hashfs`
