@@ -12,7 +12,7 @@ $ RUST_LOG=info cargo run
 [2021-01-03 16:11:02.194605 +08:00 INFO hashfs line:183] Storage init done!
 [2021-01-03 16:11:02.195465 +08:00 INFO hashfs line:214] Server is running!
 ```
-You can upload file with the curl command
+You can upload files with the curl command
 ```bash
 $ dd if=/dev/random of=test.txt bs=1m count=5
 5+0 records in
