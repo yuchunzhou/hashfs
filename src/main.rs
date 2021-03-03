@@ -1,6 +1,7 @@
 extern crate envmnt;
 #[macro_use]
 extern crate log;
+extern crate sodiumoxide;
 extern crate tokio;
 
 use std::convert::Infallible;
@@ -10,16 +11,16 @@ use std::io::Write;
 use std::net::SocketAddr;
 use std::path::Path;
 
-use chrono::{DateTime, offset::Local};
+use chrono::{offset::Local, DateTime};
 use futures::stream;
-use hyper::{Body, Request, Response};
-use hyper::{Method, StatusCode};
 use hyper::header::CONTENT_TYPE;
 use hyper::server::Server;
 use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Request, Response};
+use hyper::{Method, StatusCode};
 use multer::Multipart;
-use ring::digest;
 use serde::Serialize;
+use sodiumoxide::crypto::hash;
 
 #[derive(Serialize)]
 struct FileObject {
@@ -38,7 +39,7 @@ impl FileObject {
     }
 
     fn file_hash(&self, content: &[u8]) -> String {
-        let digest = digest::digest(&digest::SHA256, content);
+        let digest = hash::sha256::hash(content).0;
         let hash_vec = Vec::from(digest.as_ref());
 
         let mut hash_str = String::new();
@@ -53,7 +54,12 @@ impl FileObject {
 
     fn save_file(&mut self, content: &[u8]) -> Result<(), std::io::Error> {
         let file_hash = self.file_hash(content);
-        let file_ext = Path::new(&self.filename).extension().unwrap().to_str().unwrap().to_lowercase();
+        let file_ext = Path::new(&self.filename)
+            .extension()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_lowercase();
 
         let storage_root = envmnt::get_or("STORAGE_ROOT", "./data");
         let path = Path::new(&storage_root);
@@ -72,7 +78,11 @@ impl FileObject {
         let filename = format!("{}.{}", file_hash, file_ext);
         let path = path.join(&filename);
         let uri = uri.join(&filename);
-        self.uri = format!("{:?}/{:?}", envmnt::get_or("ACCESS_DOMAIN", "https://ycz0926.site/assets"), uri.to_str().unwrap());
+        self.uri = format!(
+            "{:?}/{:?}",
+            envmnt::get_or("ACCESS_DOMAIN", "https://ycz0926.site/assets"),
+            uri.to_str().unwrap()
+        );
 
         if path.exists() {
             return Ok(());
@@ -111,7 +121,8 @@ async fn serve_func(req: Request<Body>) -> Result<Response<Body>, Box<dyn Error 
                 .and_then(|ct| multer::parse_boundary(ct).ok());
             if boundary.is_none() {
                 *response.status_mut() = StatusCode::BAD_REQUEST;
-                *response.body_mut() = Body::from("Unsupported content type, multipart/form-data supports only!");
+                *response.body_mut() =
+                    Body::from("Unsupported content type, multipart/form-data supports only!");
                 return Ok(response);
             }
 
@@ -177,7 +188,10 @@ fn init_storage() {
     let path = Path::new(&storage_root);
 
     if !path.exists() {
-        DirBuilder::new().recursive(true).create(envmnt::get_or("STORAGE_ROOT", "./data")).unwrap();
+        DirBuilder::new()
+            .recursive(true)
+            .create(envmnt::get_or("STORAGE_ROOT", "./data"))
+            .unwrap();
     }
 
     info!("Storage init done!");
@@ -188,15 +202,18 @@ fn init_log() {
     let mut builder = env_logger::builder();
     builder.format(|buf, record| {
         let now: DateTime<Local> = Local::now();
-        writeln!(buf,
-                 "{}",
-                 format!(
-                     "[{} {} {} line:{}] {}",
-                     now.to_string(),
-                     record.level().to_string().to_uppercase(),
-                     record.module_path().unwrap(),
-                     record.line().unwrap(),
-                     record.args()))
+        writeln!(
+            buf,
+            "{}",
+            format!(
+                "[{} {} {} line:{}] {}",
+                now.to_string(),
+                record.level().to_string().to_uppercase(),
+                record.module_path().unwrap(),
+                record.line().unwrap(),
+                record.args()
+            )
+        )
     });
     builder.init();
 }
